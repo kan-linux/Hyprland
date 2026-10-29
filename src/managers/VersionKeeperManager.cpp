@@ -20,6 +20,7 @@ using namespace Hyprutils::OS;
 constexpr const char* VERSION_FILE_NAME = "lastVersion";
 
 CVersionKeeperManager::CVersionKeeperManager() {
+#if 0
     static auto PNONOTIFY = CConfigValue<Config::INTEGER>("ecosystem:no_update_news");
 
     const auto  DATAROOT = NFsUtils::getDataHome();
@@ -58,9 +59,11 @@ CVersionKeeperManager::CVersionKeeperManager() {
         CProcess proc("hyprland-update-screen", {"--new-version", HYPRLAND_VERSION});
         proc.runAsync();
     });
+#endif
 }
 
 bool CVersionKeeperManager::isMajorVersionOlderThanRunning(const std::string& ver) {
+#if 0
     const CVarList        verStrings(ver, 0, '.', true);
 
     const int             V1 = strToNumber<uint32_t>(verStrings[0]).value_or(0);
@@ -75,9 +78,12 @@ bool CVersionKeeperManager::isMajorVersionOlderThanRunning(const std::string& ve
         return true;
     if (R2 > V2)
         return true;
+#endif
+    (void)ver;
     return false;
 }
 
 bool CVersionKeeperManager::fired() {
-    return m_fired;
+    //return m_fired;
+    return true;
 }
