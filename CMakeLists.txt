@@ -253,6 +253,10 @@ if(Git_FOUND)
   endif()
 endif()
 
+if(NOT GIT_TAG OR GIT_TAG STREQUAL "unknown")
+  set(GIT_TAG "v${VER}")
+endif()
+
 configure_file(
     ${CMAKE_SOURCE_DIR}/src/version.h.in
     ${CMAKE_SOURCE_DIR}/src/version.h

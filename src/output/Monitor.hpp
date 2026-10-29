@@ -174,6 +174,7 @@ namespace Monitor {
         PHLANIMVAR<float> m_zoomAnimProgress;
         CTimer            m_newMonitorAnimTimer;
         int               m_zoomAnimFrameCounter = 0;
+        bool              m_hwPresentLogged      = false;
 
         struct {
             bool canTear         = false;

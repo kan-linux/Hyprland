@@ -31,6 +31,11 @@
 #include <random>
 #include <print>
 #include <cstring>
+#include <cstdio>
+#include <chrono>
+#include <unordered_set>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <filesystem>
 #include <fstream>
 #include "ipc/s1/S1.hpp"
@@ -95,6 +100,51 @@ using enum NContentType::eContentType;
 using namespace NColorManagement;
 using namespace Desktop::View;
 using namespace Render::GL;
+
+// kanlinux: two-phase splash handoff. Both signals come from Hyprland.
+//   HANDOFF — just before DRM init: splash drops master, holds last frame.
+//             This one is SYNCHRONOUS: we must not take DRM master until
+//             splash replies "DROPPED", otherwise seatd hits EBUSY.
+//   EXIT    — after first hw-present (Monitor.cpp): splash quits.
+void signalSplash(const char* msg) {
+    int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    if (fd < 0)
+        return;
+
+    sockaddr_un addr{};
+    addr.sun_family = AF_UNIX;
+    std::snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", "/run/kanlinux-splash.sock");
+
+    if (connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0) {
+        (void)write(fd, msg, std::strlen(msg));
+        if (std::strncmp(msg, "HANDOFF", 7) == 0) {
+            // block until splash has dropped DRM master
+            char     ack[16] = {0};
+            ssize_t  n      = read(fd, ack, sizeof(ack) - 1);
+            if (n <= 0 || !std::strstr(ack, "DROPPED"))
+                initMark("signalSplash: HANDOFF ack missing — DRM race likely");
+            else
+                initMark("signalSplash: splash dropped master, proceeding");
+        }
+    }
+    close(fd);
+}
+
+// kanlinux: internal profiler function for Hyprland, troubleshooting and figure out performance issue in Hyprland
+// enable rate-limitation to avoid too much logs
+// logs will be seen in stderr and /tmp/kanlinux-init.log and journal log
+void initMark(const std::string& what) {
+    static std::unordered_set<std::string> seen;
+    if (!seen.insert(what).second)
+        return;
+    static const auto T0 = std::chrono::steady_clock::now();
+    const auto        MS = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - T0).count();
+    std::println(stderr, "init[{}ms] {}", MS, what);
+    if (FILE * f = fopen("/tmp/kanlinux-init.log", "a")) {
+        std::println(f, "init[{}ms] {}", MS, what);
+        fclose(f);
+    }
+}
 
 static int handleCritSignal(int signo, void* data) {
     LOG(Log::DEBUG, "Hyprland received signal {}", signo);
@@ -326,6 +376,7 @@ void CCompositor::initServer(std::string socketName, int socketFd) {
     option.backendRequestMode = Aquamarine::eBackendRequestMode::AQ_BACKEND_REQUEST_FALLBACK;
     implementations.emplace_back(option);
 
+    signalSplash("HANDOFF\n");
     m_aqBackend = CBackend::create(implementations, options);
 
     if (!m_aqBackend) {

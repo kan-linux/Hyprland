@@ -27,6 +27,11 @@ enum eManagersInitStage : uint8_t {
     STAGE_LATE
 };
 
+// kanlinux: internal profiler function for Hyprland, troubleshooting and figure out performance issue in Hyprland
+void initMark(const std::string& what);
+// kanlinux: splash two-phase handoff ("HANDOFF\n" / "EXIT\n")
+void signalSplash(const char* msg);
+
 class CCompositor {
   public:
     CCompositor(bool onlyConfig = false);

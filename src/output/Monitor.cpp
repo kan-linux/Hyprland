@@ -1,4 +1,7 @@
 #include "Monitor.hpp"
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
 #include "../desktop/view/window/WindowEffectsController.hpp"
 #include "../desktop/view/window/WindowPresentation.hpp"
 #include "../helpers/MiscFunctions.hpp"
@@ -62,6 +65,10 @@
 #include <hyprutils/string/String.hpp>
 #include <hyprutils/utils/ScopeGuard.hpp>
 #include <cstring>
+#include <cstdio>
+#include <chrono>
+#include <thread>
+#include <format>
 #include <climits>
 #include <optional>
 #include <ranges>
@@ -69,6 +76,52 @@
 #include <algorithm>
 
 using namespace Hyprutils::String;
+
+// kanlinux: tell greetd that the first frame is on screen so it can start greeter.
+// Protocol: connect to Unix socket, send "READY <WAYLAND_DISPLAY>\n".
+// Path must match greetd notify.rs NOTIFY_SOCK_PATH.
+//
+// Retry on a helper thread: one-shot connect loses the READY forever if the
+// first frame lands before greetd binds the socket. QEMU/llvmpipe is slow
+// enough that the old one-shot won the race; real GPUs are not. Also must not
+// block the present callback while waiting for greetd.
+static void notifyGreetdFirstFrame() {
+    std::thread([]() {
+        constexpr const char* path = "/run/kanlinux-hyprland-ready.sock";
+
+        char       display[64];
+        const char* env = getenv("WAYLAND_DISPLAY");
+        std::snprintf(display, sizeof(display), "%s", (env && *env) ? env : "wayland-1");
+
+        char buf[256];
+        std::snprintf(buf, sizeof(buf), "READY %s\n", display);
+
+        sockaddr_un addr{};
+        addr.sun_family = AF_UNIX;
+        std::snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", path);
+
+        constexpr int maxAttempts = 150; /* 15s @ 100ms */
+        for (int i = 0; i < maxAttempts; ++i) {
+            int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+            if (fd < 0) {
+                initMark("notify greetd: socket() failed");
+                return;
+            }
+            if (connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0) {
+                const ssize_t n = write(fd, buf, std::strlen(buf));
+                close(fd);
+                if (n > 0)
+                    initMark(std::format("notify greetd: sent READY {}", display));
+                else
+                    initMark("notify greetd: write failed");
+                return;
+            }
+            close(fd);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        initMark("notify greetd: gave up, greetd never listened");
+    }).detach();
+}
 using namespace Hyprutils::Utils;
 using namespace Hyprutils::OS;
 using enum NContentType::eContentType;
@@ -210,6 +263,14 @@ void CMonitor::onConnect(bool noRule) {
         }
 
         m_frameScheduler->onPresented();
+
+        // kanlinux: first HW present = pixels actually on screen (vs renderMonitor's "submitted")
+        if (!m_hwPresentLogged) {
+            m_hwPresentLogged = true;
+            initMark(std::format("monitor {} first frame hw-presented", m_name));
+            signalSplash("EXIT\n"); // splash can quit — our FB is on screen
+            notifyGreetdFirstFrame();
+        }
 
         m_events.presented.emit(Time::fromTimespec(&ts));
     });

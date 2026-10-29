@@ -54,6 +54,7 @@ static void reapZombieChildrenAutomatically() {
 }
 
 int main(int argc, char** argv) {
+    initMark("hyprland main enter");
 
     // export HYPRLAND_CMD
     std::string cmd = argv[0];
