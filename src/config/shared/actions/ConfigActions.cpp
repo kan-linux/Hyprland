@@ -307,7 +307,8 @@ ActionResult Actions::pinWindow(eTogglableAction action, std::optional<PHLWINDOW
     if (!PMONITOR)
         return actionError("Window has no monitor", eActionErrorLevel::WARNING, eActionErrorCode::INVALID_STATE);
 
-    if (!PMONITOR->m_activeWorkspace || !PMONITOR->m_activeWorkspace->space())
+    const auto TARGETWORKSPACE = PMONITOR->getCurrentWorkspace();
+    if (!TARGETWORKSPACE || !TARGETWORKSPACE->space())
         return actionError("Monitor has no active workspace", eActionErrorLevel::WARNING, eActionErrorCode::INVALID_STATE);
 
     const auto LAYOUTTARGET = window->layoutTarget();
@@ -322,7 +323,7 @@ ActionResult Actions::pinWindow(eTogglableAction action, std::optional<PHLWINDOW
     window->updateFullscreenInputState();
     *window->presentation().alpha(Desktop::View::WINDOW_ALPHA_FULLSCREEN) = window->isBlockedByFullscreen() ? 0.F : 1.F;
 
-    LAYOUTTARGET->assignToSpace(PMONITOR->m_activeWorkspace->space());
+    LAYOUTTARGET->assignToSpace(TARGETWORKSPACE->space());
     window->m_ruleApplicator->propertiesChanged(Desktop::Rule::RULE_PROP_PINNED);
 
     const auto PWORKSPACE = window->m_workspace;
@@ -1023,7 +1024,7 @@ ActionResult Actions::setGroupActive(int index, std::optional<PHLWINDOW> w) {
     return {};
 }
 
-ActionResult Actions::changeWorkspace(PHLWORKSPACE ws) {
+ActionResult Actions::changeWorkspace(PHLWORKSPACE ws, bool noFocus) {
     if (!ws)
         return actionError("Invalid workspace", eActionErrorLevel::WARNING, eActionErrorCode::NO_TARGET);
 
@@ -1048,11 +1049,18 @@ ActionResult Actions::changeWorkspace(PHLWORKSPACE ws) {
 
     updateRelativeCursorCoords();
 
-    Desktop::focusState()->rawMonitorFocus(PMONITORWORKSPACEOWNER);
+    if (!noFocus)
+        Desktop::focusState()->rawMonitorFocus(PMONITORWORKSPACEOWNER);
 
     if (*PHIDESPECIALONWORKSPACECHANGE)
         PMONITORWORKSPACEOWNER->setSpecialWorkspace(nullptr);
-    PMONITORWORKSPACEOWNER->changeWorkspace(ws, false, true);
+    PMONITORWORKSPACEOWNER->changeWorkspace(ws, false, true, noFocus);
+
+    if (noFocus) {
+        // Everything else is only relevant when we want to change the focus.
+        // Thus, when `noFocus` is `true`, we can exit early here.
+        return {};
+    }
 
     if (PMONITOR != PMONITORWORKSPACEOWNER) {
         Vector2D middle  = PMONITORWORKSPACEOWNER->middle();
@@ -1089,9 +1097,9 @@ ActionResult Actions::changeWorkspace(PHLWORKSPACE ws) {
     return {};
 }
 
-ActionResult Actions::changeWorkspace(const std::string& ws) {
+ActionResult Actions::changeWorkspace(const std::string& ws, bool noFocus) {
     const auto WORKSPACE = resolveWorkspaceForChange(ws);
-    const auto res       = Actions::changeWorkspace(WORKSPACE);
+    const auto res       = Actions::changeWorkspace(WORKSPACE, noFocus);
     if (WORKSPACE)
         WORKSPACE->ready();
     return res;
