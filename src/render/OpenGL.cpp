@@ -2006,11 +2006,9 @@ void CHyprOpenGLImpl::renderTextureWithBlurInternal(CRenderContext& ctx, SP<ITex
 }
 
 static SShaderVariant getDecoVariant(CRenderContext& ctx) {
-    const bool         IS_ICC          = g_pHyprRenderer->workBufferImageDescription(ctx)->value().icc.present;
-    const auto         settings        = g_pHyprRenderer->getCMSettings(ctx, g_pHyprRenderer->workBufferImageDescription(ctx), getDefaultImageDescription(), nullptr, true,
-                                                                        ctx.m_data.pMonitor->m_sdrMinLuminance, ctx.m_data.pMonitor->m_sdrMaxLuminance);
-    const auto         uniformSettings = g_pHyprRenderer->getCMSettings(ctx, getDefaultImageDescription(), g_pHyprRenderer->workBufferImageDescription(ctx), nullptr, true,
-                                                                        ctx.m_data.pMonitor->m_sdrMinLuminance, ctx.m_data.pMonitor->m_sdrMaxLuminance);
+    const bool         IS_ICC   = g_pHyprRenderer->workBufferImageDescription(ctx)->value().icc.present;
+    const auto         settings = g_pHyprRenderer->getCMSettings(ctx, getDefaultImageDescription(), g_pHyprRenderer->workBufferImageDescription(ctx), nullptr, true,
+                                                                 ctx.m_data.pMonitor->m_sdrMinLuminance, ctx.m_data.pMonitor->m_sdrMaxLuminance);
 
     ShaderFeatureFlags features = SH_FEAT_ROUNDING | SH_FEAT_CM | globalFeatures(ctx);
     if (IS_ICC)
@@ -2024,7 +2022,7 @@ static SShaderVariant getDecoVariant(CRenderContext& ctx) {
         if (settings.needsSDRmod)
             features |= SH_FEAT_SDR_MOD;
     }
-    return {.features = features, .sourceTF = uniformSettings.sourceTF, .targetTF = uniformSettings.targetTF};
+    return {.features = features, .sourceTF = settings.sourceTF, .targetTF = settings.targetTF};
 }
 
 void CHyprOpenGLImpl::renderBorder(CRenderContext& ctx, const CBox& box, const Config::CGradientValueData& grad, SBorderRenderData data) {
@@ -2332,7 +2330,13 @@ void CHyprOpenGLImpl::renderInnerGlow(CRenderContext& ctx, const CBox& box, int 
 
     blend(true);
 
-    auto shader = useShader(getShaderVariant(SH_FRAG_INNER_GLOW, globalFeatures(ctx)));
+    WP<CShader> shader;
+    const bool  skipCM = !m_cmSupported || !g_pHyprRenderer->workBufferImageDescription(ctx)->needsCM(getDefaultImageDescription());
+    if (!skipCM) {
+        shader = useShader(getShaderVariant(SH_FRAG_INNER_GLOW, getDecoVariant(ctx)));
+        passCMUniforms(ctx, shader, getDefaultImageDescription());
+    } else
+        shader = useShader(getShaderVariant(SH_FRAG_INNER_GLOW, globalFeatures(ctx)));
 
     shader->setUniformMatrix3fv(SHADER_PROJ, 1, GL_TRUE, glMatrix.getMatrix());
 
@@ -2340,9 +2344,7 @@ void CHyprOpenGLImpl::renderInnerGlow(CRenderContext& ctx, const CBox& box, int 
     if (!grad1.m_colors.empty())
         color = grad1.m_colors[0];
 
-    const auto converted = g_pHyprRenderer->getConvertedColor(ctx, color.stripA());
-    shader->setUniformFloat4(SHADER_COLOR, converted.r, converted.g, converted.b, color.a * a);
-    shader->setUniformFloat4(SHADER_COLOR_SRGB, color.r, color.g, color.b, color.a * a);
+    shader->setUniformFloat4(SHADER_COLOR, color.r, color.g, color.b, color.a);
 
     shader->setUniform4fv(SHADER_GRADIENT, grad1.m_colorsOkLabA.size() / 4, grad1.m_colorsOkLabA);
     shader->setUniformInt(SHADER_GRADIENT_LENGTH, grad1.m_colorsOkLabA.size() / 4);
