@@ -1,4 +1,5 @@
 #include "Renderer.hpp"
+#include "SurfaceDamage.hpp"
 #include "../Compositor.hpp"
 #include "../helpers/math/Math.hpp"
 #include <algorithm>
@@ -42,6 +43,7 @@
 #include "../helpers/MainLoopExecutor.hpp"
 #include "../output/Monitor.hpp"
 #include "../output/OutputCommitCoordinator.hpp"
+#include "../output/MonitorWindowTransaction.hpp"
 #include "../state/MonitorState.hpp"
 #include "../state/WorkspaceState.hpp"
 #include "macros.hpp"
@@ -2303,6 +2305,14 @@ void IHyprRenderer::renderMonitor(PHLMONITOR pMonitor, bool commit) {
             pMonitor->m_activeWorkspace->space()->recalculate(Layout::RECALCULATE_REASON_RENDER_MONITOR);
     }
 
+    const auto TRANSACTION = WP<Monitor::CMonitorWindowTransaction>(pMonitor->m_windowTransaction);
+    if (TRANSACTION)
+        TRANSACTION->onPreRender();
+    const CScopeGuard transactionGuard([TRANSACTION] {
+        if (TRANSACTION)
+            TRANSACTION->onPostRender();
+    });
+
     // needsFrame can be cleared by commits that didnt consume our damage like a
     // commit while a pageflip was in flight, so pending damage must keep the frame alive.
     if (!pMonitor->m_output->needsFrame && pMonitor->m_forceFullFrames == 0 && !pMonitor->m_damage.hasChanged())
@@ -3012,11 +3022,8 @@ void IHyprRenderer::damageSurface(SP<CWLSurfaceResource> pSurface, double x, dou
     if (scale != 1.0)
         damageBox.scale(scale);
 
-    damageBox.translate({x, y});
-
-    const auto EXTENTS = damageBox.getExtents();
-
-    CRegion    damageBoxForEach;
+    const Vector2D POSITION = {x, y};
+    const auto     EXTENTS  = damageBox.getExtents().translate(POSITION);
 
     for (auto const& m : State::monitorState()->monitors()) {
         if (!m->m_output)
@@ -3024,17 +3031,13 @@ void IHyprRenderer::damageSurface(SP<CWLSurfaceResource> pSurface, double x, dou
         if (!EXTENTS.overlaps(m->logicalBox()))
             continue;
 
-        damageBoxForEach.set(damageBox);
-        damageBoxForEach.translate({-m->m_position.x, -m->m_position.y}).scale(m->m_scale);
-
-        m->addDamage(damageBoxForEach);
+        m->addDamage(surfaceDamageToPixels(damageBox, POSITION - m->m_position, m->m_scale));
     }
 
     static auto PLOGDAMAGE = CConfigValue<Config::INTEGER>("debug:log_damage");
 
     if (*PLOGDAMAGE)
-        LOG(Log::DEBUG, "Damage: Surface (extents): xy: {}, {} wh: {}, {}", damageBox.pixman()->extents.x1, damageBox.pixman()->extents.y1,
-            damageBox.pixman()->extents.x2 - damageBox.pixman()->extents.x1, damageBox.pixman()->extents.y2 - damageBox.pixman()->extents.y1);
+        LOG(Log::DEBUG, "Damage: Surface (extents): xy: {}, {} wh: {}, {}", EXTENTS.x, EXTENTS.y, EXTENTS.w, EXTENTS.h);
 }
 
 void IHyprRenderer::damageWindow(PHLWINDOW pWindow, bool forceFull) {
