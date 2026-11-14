@@ -54,6 +54,20 @@ PHLWINDOW CViewHitTester::windowAtInternal(const Vector2D& pos, uint16_t propert
 
     const auto  isShadowedByModal = [](PHLWINDOW w) -> bool { return *PMODALPARENTBLOCKING && !w->backend().isX11() && w->backend().traits().hasModalChild; };
 
+    // The border-grab band (BORDER_GRAB_AREA expansion, for resize-on-border) must
+    // not steal a hit from a window actually under the cursor: with overlapping
+    // floating windows the lower window's visible area lies inside the upper
+    // window's band. A band-only match is valid just for points in gaps.
+    const auto realBoxAt = [&]() -> bool {
+        for (auto const& w : WINDOWS) {
+            if (!w->mapped() || !w->acceptsInput() || !w->m_workspace || !w->m_workspace->visible())
+                continue;
+            if (w->getWindowBoxUnified(properties).containsPoint(pos))
+                return true;
+        }
+        return false;
+    };
+
     // pinned windows on top of floating regardless
     if (properties & ALLOW_FLOATING) {
         for (auto const& w : WINDOWS | std::views::reverse) {
@@ -66,7 +80,8 @@ PHLWINDOW CViewHitTester::windowAtInternal(const Vector2D& pos, uint16_t propert
                 CBox       box = BB.copy().expand(!w->backend().traits().overrideRedirect ? BORDER_GRAB_AREA : 0);
                 if (HITBOX_SHRINK > 0 && w != LASTFOCUSED)
                     box = box.copy().expand(-HITBOX_SHRINK);
-                if (box.containsPoint(pos))
+                // a band-only hit must not steal the click from a window actually under the cursor
+                if (box.containsPoint(pos) && (BB.containsPoint(pos) || !realBoxAt()))
                     return w;
 
                 if (!w->backend().isX11()) {
@@ -110,7 +125,7 @@ PHLWINDOW CViewHitTester::windowAtInternal(const Vector2D& pos, uint16_t propert
                     CBox       box = BB.copy().expand(!w->backend().traits().overrideRedirect ? BORDER_GRAB_AREA : 0);
                     if (HITBOX_SHRINK > 0 && w != LASTFOCUSED)
                         box = box.copy().expand(-HITBOX_SHRINK);
-                    if (box.containsPoint(pos)) {
+                    if (box.containsPoint(pos) && (BB.containsPoint(pos) || !realBoxAt())) {
                         if (w->backend().isX11()) {
                             const auto TRAITS = w->backend().traits();
                             if (TRAITS.overrideRedirect && !TRAITS.wantsFocus) {
