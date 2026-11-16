@@ -17,6 +17,7 @@
 #include "../../../layout/target/Target.hpp"
 #include "../../../layout/target/WindowGroupTarget.hpp"
 #include "../../../layout/target/WindowTarget.hpp"
+#include "../../../layout/target/WindowGeometry.hpp"
 
 #include "../../../render/Renderer.hpp"
 #include "../../../animation/WorkspaceAnimationController.hpp"
@@ -207,11 +208,11 @@ void IFullscreenHandler::setTargetSizeAndPosition(const SP<Layout::ITarget> targ
     if (TARGET_INTERNAL_MODE == FSMODE_FULLSCREEN) {
         const CBox MONBOX                                  = MONITOR->logicalBox();
         Fullscreen::controller()->m_windowPosSettingQueued = true;
-        LAYOUT_TARGET->setPositionGlobal(MONBOX);
+        LAYOUT_TARGET->setPositionGlobal(MONBOX, Layout::TARGET_UPDATE_NO_UPDATE_RESTORE_CACHE);
     } else if (TARGET_INTERNAL_MODE == FSMODE_MAXIMIZED) {
         const CBox WORKAREA                                = WORKSPACE->space()->workArea(target->floating());
         Fullscreen::controller()->m_windowPosSettingQueued = true;
-        LAYOUT_TARGET->setPositionGlobal(WORKAREA);
+        LAYOUT_TARGET->setPositionGlobal(WORKAREA, Layout::TARGET_UPDATE_NO_UPDATE_RESTORE_CACHE);
     }
     Fullscreen::controller()->m_windowPosSettingQueued = false;
 }
@@ -248,7 +249,7 @@ void IFullscreenHandler::syncTargetSizeAndPosition() {
         // No need to compare with current value also since it'll get overwritten by goal anyway
         if (CURRENT_REAL_POS_GOAL != EXPECTED_REAL_POS || CURRENT_REAL_SIZE_GOAL != EXPECTED_REAL_SIZE) {
             controller()->m_windowPosSettingQueued = true;
-            LAYOUT_TARGET->setPositionGlobal(MONBOX);
+            LAYOUT_TARGET->setPositionGlobal(MONBOX, Layout::TARGET_UPDATE_NO_UPDATE_RESTORE_CACHE);
         }
     } else if (TARGET_INTERNAL_MODE == FSMODE_MAXIMIZED) {
 
@@ -262,12 +263,13 @@ void IFullscreenHandler::syncTargetSizeAndPosition() {
         const auto CURRENT_REAL_POS_GOAL  = WINDOW.get()->position(Desktop::View::IGeometric::GEOMETRIC_GOAL);
         const auto CURRENT_REAL_SIZE_GOAL = WINDOW.get()->size(Desktop::View::IGeometric::GEOMETRIC_GOAL);
 
-        const auto EXPECTED_REAL_POS  = roundedWorkArea.pos() + RESERVED.topLeft;
-        const auto EXPECTED_REAL_SIZE = roundedWorkArea.size() - (RESERVED.topLeft + RESERVED.bottomRight);
+        auto       expectedBox = CBox{roundedWorkArea.pos() + RESERVED.topLeft, roundedWorkArea.size() - RESERVED.topLeft - RESERVED.bottomRight};
+        if (std::floor(MONITOR->m_scale) != MONITOR->m_scale && WINDOW->presentation().borderExtent() > 0)
+            expectedBox = Layout::windowContentBox(roundedWorkArea, RESERVED, MONITOR->m_position, MONITOR->m_scale);
 
-        if (CURRENT_REAL_POS_GOAL != EXPECTED_REAL_POS || CURRENT_REAL_SIZE_GOAL != EXPECTED_REAL_SIZE) {
+        if (CURRENT_REAL_POS_GOAL != expectedBox.pos() || CURRENT_REAL_SIZE_GOAL != expectedBox.size()) {
             controller()->m_windowPosSettingQueued = true;
-            LAYOUT_TARGET->setPositionGlobal(WORKSPACE->space()->workArea(FS_TARGET->floating()));
+            LAYOUT_TARGET->setPositionGlobal(WORKSPACE->space()->workArea(FS_TARGET->floating()), Layout::TARGET_UPDATE_NO_UPDATE_RESTORE_CACHE);
         }
     }
     Fullscreen::controller()->m_windowPosSettingQueued = false;

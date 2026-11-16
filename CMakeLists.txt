@@ -9,6 +9,17 @@ project(
   DESCRIPTION "A Modern C++ Wayland Compositor"
   VERSION ${VER})
 
+set(HYPRLAND_TESTS_DEFAULT OFF)
+if(CMAKE_BUILD_TYPE MATCHES Debug OR CMAKE_BUILD_TYPE MATCHES DEBUG)
+  set(HYPRLAND_TESTS_DEFAULT ON)
+endif()
+option(BUILD_TESTING "Build tests" ${HYPRLAND_TESTS_DEFAULT})
+# WITH_TESTS is the project-specific override for CTest's BUILD_TESTING option.
+if(DEFINED WITH_TESTS)
+  set(BUILD_TESTING "${WITH_TESTS}" CACHE BOOL "Build tests" FORCE)
+endif()
+option(WITH_COVERAGE "Enable coverage instrumentation when building tests" ON)
+
 include(CTest)
 include(CheckIncludeFile)
 include(GNUInstallDirs)
@@ -87,11 +98,9 @@ message(
 if(CMAKE_BUILD_TYPE MATCHES Debug OR CMAKE_BUILD_TYPE MATCHES DEBUG)
   message(STATUS "Configuring Hyprland in Debug with CMake")
   add_compile_definitions(HYPRLAND_DEBUG)
-  set(BUILD_TESTING ON)
 else()
   add_compile_options(-O3)
   message(STATUS "Configuring Hyprland in Release with CMake")
-  set(BUILD_TESTING OFF)
 endif()
 
 add_compile_definitions(HYPRLAND_VERSION="${HYPRLAND_VERSION}")
@@ -100,6 +109,11 @@ include_directories(. "src/" "protocols/")
 
 set(CMAKE_CXX_STANDARD 26)
 set(CXX_STANDARD_REQUIRED ON)
+
+# disable module scanning as Hyprland doesn't use C++ modules and the flags
+# added by scanning prevent GCC from using precompiled headers
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+
 add_compile_options(
   -Wall
   -Wextra
@@ -145,13 +159,11 @@ if(NOT CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
 endif()
 
 set(AQUAMARINE_MINIMUM_VERSION 0.15.0)
-set(HYPRLANG_MINIMUM_VERSION 0.6.7)
 set(HYPRCURSOR_MINIMUM_VERSION 0.1.7)
 set(HYPRUTILS_MINIMUM_VERSION 0.14.3)
 set(HYPRGRAPHICS_MINIMUM_VERSION 0.5.1)
 
 pkg_check_modules(aquamarine_dep REQUIRED IMPORTED_TARGET aquamarine>=${AQUAMARINE_MINIMUM_VERSION})
-pkg_check_modules(hyprlang_dep REQUIRED IMPORTED_TARGET hyprlang>=${HYPRLANG_MINIMUM_VERSION})
 pkg_check_modules(hyprcursor_dep REQUIRED IMPORTED_TARGET hyprcursor>=${HYPRCURSOR_MINIMUM_VERSION})
 pkg_check_modules(hyprutils_dep REQUIRED IMPORTED_TARGET hyprutils>=${HYPRUTILS_MINIMUM_VERSION})
 pkg_check_modules(hyprgraphics_dep REQUIRED IMPORTED_TARGET hyprgraphics>=${HYPRGRAPHICS_MINIMUM_VERSION})
@@ -165,7 +177,6 @@ set(AQUAMARINE_VERSION "${aquamarine_dep_VERSION}")
 set(AQUAMARINE_VERSION_MAJOR "${AQ_VERSION_MAJOR}")
 set(AQUAMARINE_VERSION_MINOR "${AQ_VERSION_MINOR}")
 set(AQUAMARINE_VERSION_PATCH "${AQ_VERSION_PATCH}")
-set(HYPRLANG_VERSION "${hyprlang_dep_VERSION}")
 set(HYPRUTILS_VERSION "${hyprutils_dep_VERSION}")
 set(HYPRCURSOR_VERSION "${hyprcursor_dep_VERSION}")
 set(HYPRGRAPHICS_VERSION "${hyprgraphics_dep_VERSION}")
@@ -449,7 +460,6 @@ target_link_libraries(
   hyprland_lib
   PUBLIC
   PkgConfig::aquamarine_dep
-  PkgConfig::hyprlang_dep
   PkgConfig::hyprutils_dep
   PkgConfig::hyprcursor_dep
   PkgConfig::hyprgraphics_dep
@@ -707,7 +717,7 @@ install(
   PATTERN "*.hpp"
   PATTERN "*.inc")
 
-if(BUILD_TESTING OR WITH_TESTS)
+if(BUILD_TESTING)
   message(STATUS "Building tests")
 
   # hyprtester
@@ -718,8 +728,6 @@ if(BUILD_TESTING OR WITH_TESTS)
   include(GoogleTest)
   file(GLOB_RECURSE TESTFILES "tests/*.cpp")
   add_executable(hyprland_gtests ${TESTFILES})
-  target_compile_options(hyprland_gtests PRIVATE --coverage)
-  target_link_options(hyprland_gtests PRIVATE --coverage)
   target_include_directories(
     hyprland_gtests
     PUBLIC "./include"
@@ -729,15 +737,20 @@ if(BUILD_TESTING OR WITH_TESTS)
 
   gtest_discover_tests(hyprland_gtests)
 
-  # Enable coverage in main hyprland lib
-  target_compile_options(hyprland_lib PRIVATE --coverage)
-  target_link_options(hyprland_lib PRIVATE --coverage)
-  target_link_libraries(hyprland_lib PUBLIC gcov)
+  if(WITH_COVERAGE)
+    target_compile_options(hyprland_gtests PRIVATE --coverage)
+    target_link_options(hyprland_gtests PRIVATE --coverage)
 
-  # Enable coverage in hyprland exe
-  target_compile_options(Hyprland PRIVATE --coverage)
-  target_link_options(Hyprland PRIVATE --coverage)
-  target_link_libraries(Hyprland gcov)
+    # Enable coverage in main hyprland lib
+    target_compile_options(hyprland_lib PRIVATE --coverage)
+    target_link_options(hyprland_lib PRIVATE --coverage)
+    target_link_libraries(hyprland_lib PUBLIC gcov)
+
+    # Enable coverage in hyprland exe
+    target_compile_options(Hyprland PRIVATE --coverage)
+    target_link_options(Hyprland PRIVATE --coverage)
+    target_link_libraries(Hyprland gcov)
+  endif()
 endif()
 
 if(BUILD_TESTING)

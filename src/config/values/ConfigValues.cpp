@@ -428,7 +428,7 @@ std::vector<SP<IValue>> Values::getConfigValues() {
          * input:touchdevice:
          */
 
-        MS<Int>("input:touchdevice:transform", "Transform the input from touchdevices.", 0, {.min = 0, .max = 6, .refresh = Supplementary::REFRESH_INPUT_DEVICES}),
+        MS<Int>("input:touchdevice:transform", "Transform the input from touchdevices.", 0, {.min = 0, .max = 7, .refresh = Supplementary::REFRESH_INPUT_DEVICES}),
         MS<String>("input:touchdevice:output", "The monitor to bind touch devices.", "[[Auto]]", {.refresh = Supplementary::REFRESH_INPUT_DEVICES}),
         MS<Bool>("input:touchdevice:enabled", "Whether input is enabled for touch devices.", true, {.refresh = Supplementary::REFRESH_INPUT_DEVICES}),
 
@@ -446,7 +446,7 @@ std::vector<SP<IValue>> Values::getConfigValues() {
          */
 
         MS<Bool>("input:tablet:enabled", "Whether input is enabled for tablets.", true, {.refresh = Supplementary::REFRESH_INPUT_DEVICES}),
-        MS<Int>("input:tablet:transform", "transform the input from tablets.", 0, {.min = 0, .max = 6, .refresh = Supplementary::REFRESH_INPUT_DEVICES}),
+        MS<Int>("input:tablet:transform", "transform the input from tablets.", 0, {.min = 0, .max = 7, .refresh = Supplementary::REFRESH_INPUT_DEVICES}),
         MS<String>("input:tablet:output", "the monitor to bind tablets.", STRVAL_EMPTY, {.refresh = Supplementary::REFRESH_INPUT_DEVICES}),
         MS<Vec2>("input:tablet:region_position", "position of the mapped region in monitor layout.", Config::VEC2{},
                  {.validator = vec2Range(-100000, -100000, 100000, 100000), .refresh = Supplementary::REFRESH_INPUT_DEVICES}),
@@ -609,6 +609,8 @@ std::vector<SP<IValue>> Values::getConfigValues() {
         MS<String>("misc:bell_sound", "path to custom wav/ogg system bell. `none` or an empty string mute it. `default` uses the system's current one.", "default"),
         MS<Int>("misc:new_float_force_onscreen", "whether new floating windows must be placed fully/partially on-screen", 2),
         MS<Int>("misc:float_force_onscreen", "whether existing floating windows must remain fully/partially on-screen", 0),
+        MS<Int>("misc:transaction_timeout", "in ms, how long to wait for when layout gets updated for the clients to update before forcing the new layout. 0 disables transactions",
+                50, {.min = 0, .max = 250}),
 
         /*
          * layer:
@@ -710,7 +712,7 @@ std::vector<SP<IValue>> Values::getConfigValues() {
         MS<Int>("cursor:warp_on_toggle_special", "Move the cursor to the last focused window when toggling a special workspace.", 0,
                 {.min = 0, .max = 2, .map = OptionMap{{"disable", 0}, {"enable", 1}, {"force", 2}}}),
         MS<String>("cursor:default_monitor", "the name of a default monitor for the cursor to be set to on startup", STRVAL_EMPTY),
-        MS<Float>("cursor:zoom_factor", "the factor to zoom by around the cursor. 1 means no zoom.", 1, {.min = 1, .max = 10, .refresh = Supplementary::REFRESH_CURSOR_ZOOMS}),
+        MS<Float>("cursor:zoom_factor", "the factor to zoom by around the cursor. 1 means no zoom.", 1, {.min = 1, .max = 50, .refresh = Supplementary::REFRESH_CURSOR_ZOOMS}),
         MS<Bool>("cursor:zoom_rigid", "whether the zoom should follow the cursor rigidly or loosely", false),
         MS<Bool>("cursor:zoom_disable_aa", "If enabled, when zooming, no antialiasing will be used", false),
         MS<Bool>("cursor:zoom_detached_camera", "Detaches the camera from the mouse when zoomed in", true),
@@ -818,7 +820,7 @@ std::vector<SP<IValue>> Values::getConfigValues() {
                  {.refresh = Supplementary::REFRESH_LAYOUTS}),
         MS<Float>("scrolling:column_width", "the default width of a column.", 0.5, {.min = 0.1, .max = 1.0}),
         MS<Int>("scrolling:focus_fit_method", "When a column is focused, what method should be used to bring it into view", 1,
-                {.min = 0, .max = 1, .map = OptionMap{{"center", 0}, {"fit", 1}}}),
+                {.min = 0, .max = 2, .map = OptionMap{{"center", 0}, {"fit", 1}, {"clamped_center", 2}}}),
         MS<Int>("scrolling:follow_focus",
                 "Behaviour of the scrolling tape when a window is in focus. 0: Focus doesn't cause tape move. 1: Focus may cause tape move, mouse click always moves the tape. 2: "
                 "Focus may cause tape move.",

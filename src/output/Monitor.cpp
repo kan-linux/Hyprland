@@ -57,6 +57,7 @@
 #include "../helpers/Drm.hpp"
 #include "MonitorFrameScheduler.hpp"
 #include "OutputCommitCoordinator.hpp"
+#include "MonitorWindowTransaction.hpp"
 #include <aquamarine/output/Output.hpp>
 #include "debug/log/Logger.hpp"
 #include "notification/NotificationOverlay.hpp"
@@ -322,6 +323,7 @@ void CMonitor::onConnect(bool noRule) {
 
     m_frameScheduler         = makeUnique<CMonitorFrameScheduler>(m_self.lock());
     m_frameScheduler->m_self = WP<CMonitorFrameScheduler>(m_frameScheduler);
+    m_windowTransaction      = makeUnique<CMonitorWindowTransaction>(m_self.lock());
 
     m_tearingState.canTear = m_output->getBackend()->type() == Aquamarine::AQ_BACKEND_DRM;
 
@@ -404,8 +406,7 @@ void CMonitor::onConnect(bool noRule) {
     if (!isMirror())
         State::Workspace::monitorConnected(m_self.lock());
 
-    m_forceFullFrames = 3; // force 3 full frames to make sure there is no blinking due to double-buffering.
-    //
+    m_forceFullFrames = std::max(m_forceFullFrames, 3); // force at least 3 full frames to make sure there is no blinking due to double-buffering.
 
     if (!m_activeMonitorRule.m_mirrorOf.empty())
         setMirror(m_activeMonitorRule.m_mirrorOf);
@@ -454,6 +455,7 @@ void CMonitor::onDisconnect(bool destroy) {
     }};
 
     m_frameScheduler.reset();
+    m_windowTransaction.reset();
     m_commitCoordinator->cancelPending();
     clearModeRetry();
 
@@ -1755,7 +1757,13 @@ void CMonitor::setCTM(const Mat3x3& ctm_) {
 }
 
 uint32_t CMonitor::isSolitaryBlocked(bool full) {
-    uint32_t   reasons = 0;
+    uint32_t reasons = 0;
+
+    if (m_windowTransaction && m_windowTransaction->hasPendingPresentation()) {
+        reasons |= SC_TRANSFORM;
+        if (!full)
+            return reasons;
+    }
 
     const auto PWORKSPACE = m_activeWorkspace;
     if (!PWORKSPACE) {
@@ -1964,6 +1972,12 @@ uint16_t CMonitor::isDSBlocked(bool full) {
     static auto PDIRECTSCANOUT = CConfigValue<Config::INTEGER>("render:direct_scanout");
     static auto PNONSHADER     = CConfigValue<Config::INTEGER>("render:non_shader_cm");
     const auto  PWORKSPACE     = m_activeWorkspace;
+
+    if (m_windowTransaction && m_windowTransaction->hasPendingPresentation()) {
+        reasons |= DS_BLOCK_TRANSFORM;
+        if (!full)
+            return reasons;
+    }
 
     // Fast reject for the hot render path; full=true callers still collect
     // the remaining blockers for hyprctl/debug output below.
@@ -2214,6 +2228,10 @@ void CMonitor::handleDSleave() {
     m_drmFormat   = m_prevDrmFormat;
     m_blurFBDirty = true;
     m_damage.damageEntire();
+
+    // if swapchain in DS is an 8-bit format whilst we are configured for 10-bit, we may see a visible flicker
+    // when leaving DS. Update the swapchain format here before any further rendering to avoid that
+    m_state.updateSwapchain();
 }
 
 bool CMonitor::canAttemptDirectScanoutFast() const {
@@ -2505,7 +2523,7 @@ bool CMonitor::needsCM() {
 }
 
 static bool isCompatibleTF(eTransferFunction sourceTF, eTransferFunction targetTF) {
-    static auto PNONSHADER = CConfigValue<Hyprlang::INT>("render:non_shader_cm");
+    static auto PNONSHADER = CConfigValue<Config::INTEGER>("render:non_shader_cm");
     const auto  sdrEOTF    = NTransferFunction::fromConfig();
     return sourceTF == targetTF                                                                                                         // same
         || (sdrEOTF == NTransferFunction::TF_FORCED_GAMMA22 && sourceTF == NColorManagement::CM_TRANSFER_FUNCTION_SRGB                  // forced source gamma22 to output gamma22
@@ -2723,7 +2741,7 @@ bool CMonitor::needsACopyFB() {
 }
 
 bool CMonitor::needsUnmodifiedCopy() {
-    static const auto PKEEP = CConfigValue<Hyprlang::INT>("render:keep_unmodified_copy");
+    static const auto PKEEP = CConfigValue<Config::INTEGER>("render:keep_unmodified_copy");
     if (*PKEEP == 1)
         return true;
 
@@ -2741,7 +2759,7 @@ bool CMonitor::needsUnmodifiedCopy() {
 }
 
 bool CMonitor::useFP16() {
-    static const auto PFP16 = CConfigValue<Hyprlang::INT>("render:use_fp16");
+    static const auto PFP16 = CConfigValue<Config::INTEGER>("render:use_fp16");
 
     auto              isSRGB = [this] {
         if (m_imageDescription->value().transferFunction != CM_TRANSFER_FUNCTION_SRGB && m_imageDescription->value().transferFunction != CM_TRANSFER_FUNCTION_GAMMA22)
@@ -2758,7 +2776,7 @@ bool CMonitor::useFP16() {
 }
 
 PImageDescription CMonitor::workBufferImageDescription() {
-    static const auto PFP16TF = CConfigValue<Hyprlang::INT>("render:fp16_sdr_tf");
+    static const auto PFP16TF = CConfigValue<Config::INTEGER>("render:fp16_sdr_tf");
 
     if (!useFP16() && !m_imageDescription->value().icc.present)
         return m_imageDescription;

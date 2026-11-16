@@ -41,6 +41,7 @@ namespace Monitor {
     class CMonitorResources;
     class CMonitorFrameScheduler;
     class COutputCommitCoordinator;
+    class CMonitorWindowTransaction;
     class CMonitor;
 
     class CMonitorState {
@@ -138,6 +139,7 @@ namespace Monitor {
 
         UP<CMonitorFrameScheduler>     m_frameScheduler;
         UP<COutputCommitCoordinator>   m_commitCoordinator;
+        UP<CMonitorWindowTransaction>  m_windowTransaction;
 
         // mirroring
         PHLMONITORREF              m_mirrorOf;
@@ -215,7 +217,7 @@ namespace Monitor {
             DS_BLOCK_FAILED    = (1 << 11),
             DS_BLOCK_CM        = (1 << 12),
 
-            DS_CHECKS_COUNT = 14,
+            DS_CHECKS_COUNT = 13,
         };
 
         // keep in sync with socket1 output

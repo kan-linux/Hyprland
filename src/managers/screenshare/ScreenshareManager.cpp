@@ -2,6 +2,7 @@
 #include "../../render/Renderer.hpp"
 #include "../../Compositor.hpp"
 #include "../../desktop/view/window/Window.hpp"
+#include "../../desktop/view/window/WindowPresentation.hpp"
 #include "../../protocols/core/Seat.hpp"
 #include "../../state/MonitorState.hpp"
 #include "WorkspaceCaptureSource.hpp"
@@ -34,7 +35,7 @@ void CScreenshareManager::onOutputCommit(PHLMONITOR monitor, bool copyFBPrepared
         if (frame->m_session->monitor() != monitor)
             return;
 
-        if (!copyFBPrepared && frame->m_session->m_type != SHARE_WORKSPACE)
+        if (!copyFBPrepared && (frame->m_session->m_type == SHARE_MONITOR || frame->m_session->m_type == SHARE_REGION))
             return;
 
         if (frame->m_session->m_type == SHARE_WINDOW) {
@@ -194,7 +195,8 @@ bool CScreenshareManager::isOutputBeingSSd(PHLMONITOR monitor) {
 
 bool CScreenshareManager::isOutputDSBlocked(PHLMONITOR monitor) {
     if (std::ranges::any_of(m_pendingFrames, [monitor](const auto& frame) {
-            return frame && !frame->done() && frame->m_shared && frame->m_session->m_type == SHARE_WORKSPACE && frame->m_session->monitor() == monitor;
+            return frame && !frame->done() && frame->m_shared && (frame->m_session->m_type == SHARE_WINDOW || frame->m_session->m_type == SHARE_WORKSPACE) &&
+                frame->m_session->monitor() == monitor;
         }))
         return true;
 
@@ -236,9 +238,6 @@ CScreenshareManager::SOutputCopyFBState CScreenshareManager::outputCopyFBState(P
         } else if (frame->m_session->m_type == SHARE_REGION) {
             state.pendingFrames++;
             state.pendingRegionFrames++;
-        } else if (frame->m_session->m_type == SHARE_WINDOW) {
-            state.pendingFrames++;
-            state.pendingWindowFrames++;
         }
     }
 
@@ -249,7 +248,7 @@ bool CScreenshareManager::needsWorkspaceCaptureSnapshot(PHLWINDOW window) const 
     if (!window || !window->mapped() || window->isHidden() || (window->m_ruleApplicator && window->m_ruleApplicator->noScreenShare().valueOrDefault()))
         return false;
 
-    const auto MONITOR = window->m_monitor.lock();
+    const auto MONITOR = window->presentation().monitor();
     if (!MONITOR)
         return false;
 
@@ -261,7 +260,7 @@ bool CScreenshareManager::needsWorkspaceCaptureSnapshot(PHLWINDOW window) const 
         if (!WORKSPACE || session->monitor() != MONITOR)
             return false;
 
-        if (window->m_workspace != WORKSPACE &&
+        if (window->presentation().workspace() != WORKSPACE &&
             !(session->m_workspace->mode() == HYPRLAND_WORKSPACE_IMAGE_CAPTURE_SOURCE_MANAGER_V1_CAPTURE_MODE_EVERYTHING &&
               (window->m_state & Desktop::View::WINDOW_STATE_PINNED) && window->isFloating()))
             return false;

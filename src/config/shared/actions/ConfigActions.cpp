@@ -321,7 +321,7 @@ ActionResult Actions::pinWindow(eTogglableAction action, std::optional<PHLWINDOW
         window->m_state &= ~Desktop::View::WINDOW_STATE_PINNED;
     window->stateTracker().scheduleUpdate();
     window->updateFullscreenInputState();
-    *window->presentation().alpha(Desktop::View::WINDOW_ALPHA_FULLSCREEN) = window->isBlockedByFullscreen() ? 0.F : 1.F;
+    window->presentation().setFullscreenAlpha(window->isBlockedByFullscreen() ? 0.F : 1.F);
 
     LAYOUTTARGET->assignToSpace(TARGETWORKSPACE->space());
     window->m_ruleApplicator->propertiesChanged(Desktop::Rule::RULE_PROP_PINNED);
@@ -782,7 +782,7 @@ ActionResult Actions::alterZOrder(const std::string& mode, std::optional<PHLWIND
 
 template <typename T>
 static void parsePropTrivial(Desktop::Types::COverridableVar<T>& prop, const std::string& s) {
-    static_assert(std::is_same_v<T, bool> || std::is_same_v<T, Hyprlang::INT> || std::is_same_v<T, int> || std::is_same_v<T, Hyprlang::FLOAT> || std::is_same_v<T, std::string>,
+    static_assert(std::is_same_v<T, bool> || std::is_same_v<T, Config::INTEGER> || std::is_same_v<T, int> || std::is_same_v<T, Config::FLOAT> || std::is_same_v<T, std::string>,
                   "Invalid type passed to parsePropTrivial");
 
     if (s == "unset") {
@@ -796,13 +796,13 @@ static void parsePropTrivial(Desktop::Types::COverridableVar<T>& prop, const std
                 prop.increment(true, Desktop::Types::PRIORITY_SET_PROP);
             else
                 prop = Desktop::Types::COverridableVar<T>(truthy(s), Desktop::Types::PRIORITY_SET_PROP);
-        } else if constexpr (std::is_same_v<T, Hyprlang::INT> || std::is_same_v<T, int>) {
+        } else if constexpr (std::is_same_v<T, Config::INTEGER> || std::is_same_v<T, int>) {
             if (s.starts_with("relative")) {
                 const auto VAL = std::stoi(s.substr(s.find(' ') + 1));
                 prop.increment(VAL, Desktop::Types::PRIORITY_SET_PROP);
             } else
                 prop = Desktop::Types::COverridableVar<T>(std::stoull(s), Desktop::Types::PRIORITY_SET_PROP);
-        } else if constexpr (std::is_same_v<T, Hyprlang::FLOAT>) {
+        } else if constexpr (std::is_same_v<T, Config::FLOAT>) {
             if (s.starts_with("relative")) {
                 const auto VAL = std::stof(s.substr(s.find(' ') + 1));
                 prop.increment(VAL, Desktop::Types::PRIORITY_SET_PROP);
@@ -1681,7 +1681,7 @@ ActionResult Actions::sendKeyState(Input::ModifierMask modMask, uint32_t key, ui
     return result;
 }
 
-ActionResult Actions::global(const std::string& action) {
+ActionResult Actions::global(const std::string& action, const std::optional<bool> event) {
     const auto COLONPOS = action.find_first_of(':');
     if (COLONPOS == std::string::npos)
         return {};
@@ -1695,7 +1695,11 @@ ActionResult Actions::global(const std::string& action) {
     if (!PROTO::globalShortcuts->isTaken(APPID, NAME))
         return {};
 
-    PROTO::globalShortcuts->sendGlobalShortcutEvent(APPID, NAME, Config::Actions::state()->m_passPressed);
+    bool pressed = Config::Actions::state()->m_passPressed;
+    if (event.has_value())
+        pressed = event.value();
+
+    PROTO::globalShortcuts->sendGlobalShortcutEvent(APPID, NAME, pressed);
 
     return {};
 }
@@ -1811,7 +1815,7 @@ ActionResult Actions::cycleNext(const bool next, std::optional<bool> onlyTiled, 
 }
 
 ActionResult Actions::moveIntoOrCreateGroup(Math::eDirection dir, std::optional<PHLWINDOW> w) {
-    static auto PIGNOREGROUPLOCK = CConfigValue<Hyprlang::INT>("binds:ignore_group_lock");
+    static auto PIGNOREGROUPLOCK = CConfigValue<Config::INTEGER>("binds:ignore_group_lock");
 
     if (!*PIGNOREGROUPLOCK && Desktop::windowState()->groupsLocked())
         return {};
