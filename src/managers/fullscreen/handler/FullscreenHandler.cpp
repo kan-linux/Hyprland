@@ -285,7 +285,10 @@ void IFullscreenHandler::setNoMembersAboveFullscreen(const std::optional<SP<Layo
 
     for (auto const& w : Desktop::windowState()->windows()) {
         if (w && w->m_workspace == getSpace()->workspace() && !isFullscreen(w->windowTarget()) && !(w->m_state & Desktop::View::WINDOW_STATE_PINNED)) {
-            w->fullscreenPolicy().setAllowedOverFullscreen(!SET);
+            // Floating members render above the fullscreen window (the "over fullscreen"
+            // pass in IHyprRenderer::renderWorkspaceWindowsFullscreen), so they must stay
+            // allowed over it and input-live; only tiled members fall below it.
+            w->fullscreenPolicy().setAllowedOverFullscreen(w->isFloating() || !SET);
             w->updateFullscreenInputState();
         }
     }
