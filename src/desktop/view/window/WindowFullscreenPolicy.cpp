@@ -1,4 +1,5 @@
 #include "WindowFullscreenPolicy.hpp"
+#include "../../../debug/log/Logger.hpp"
 
 using namespace Desktop::View;
 
@@ -7,6 +8,9 @@ bool CWindowFullscreenPolicy::allowedOverFullscreen() const {
 }
 
 void CWindowFullscreenPolicy::setAllowedOverFullscreen(bool allowed) {
+    // TEMP DIAGNOSTIC: catch-all probe — every policy write is logged with the
+    // caller's return address (map with addr2line against the unstripped build).
+    diagMark(std::format("[dbg-policy] setAllowedOver this={} allowed={} caller={:p}", static_cast<const void*>(this), sc<int>(allowed), __builtin_return_address(0)));
     m_allowedOverFullscreen = allowed;
 }
 

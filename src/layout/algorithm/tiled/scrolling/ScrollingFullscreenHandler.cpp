@@ -345,7 +345,10 @@ void CScrollingFullscreenHandler::setNoMembersAboveFullscreen(const std::optiona
 
         for (auto const& w : Desktop::windowState()->windows()) {
             if (w && w->m_workspace == getSpace()->workspace() && !isFullscreen(w->windowTarget()) && !(w->m_state & Desktop::View::WINDOW_STATE_PINNED)) {
-                w->fullscreenPolicy().setAllowedOverFullscreen(!SET);
+                // Kept in sync with IFullscreenHandler::setNoMembersAboveFullscreen():
+                // floating members render over the fullscreen window and must stay
+                // allowed over it and input-live; only tiled members fall below it.
+                w->fullscreenPolicy().setAllowedOverFullscreen(w->isFloating() || !SET);
                 w->updateFullscreenInputState();
             }
         }

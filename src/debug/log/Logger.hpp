@@ -76,3 +76,10 @@ namespace Log {
     inline constexpr const Hyprutils::CLI::eLogLevel INFO  = Hyprutils::CLI::LOG_DEBUG;
     inline constexpr const Hyprutils::CLI::eLogLevel TRACE = Hyprutils::CLI::LOG_TRACE;
 };
+
+// kanlinux: internal diagnostic marker for Hyprland — troubleshooting performance, layout,
+// rendering and other issues. Emits a timestamped line to stderr (→ journal) and
+// appends to /tmp/kanlinux-diag.log. Messages are deduplicated per process.
+// Kept global (not in namespace Log): a cross-layer diagnostic helper called from
+// Monitor/main/Compositor; declared here so the logging module owns its interface.
+void diagMark(const std::string& what);

@@ -118,12 +118,12 @@ void signalSplash(const char* msg) {
         (void)write(fd, msg, std::strlen(msg));
         if (std::strncmp(msg, "HANDOFF", 7) == 0) {
             // block until splash has dropped DRM master
-            char     ack[16] = {0};
-            ssize_t  n      = read(fd, ack, sizeof(ack) - 1);
+            char    ack[16] = {0};
+            ssize_t n       = read(fd, ack, sizeof(ack) - 1);
             if (n <= 0 || !std::strstr(ack, "DROPPED"))
-                initMark("signalSplash: HANDOFF ack missing — DRM race likely");
+                diagMark("signalSplash: HANDOFF ack missing — DRM race likely");
             else
-                initMark("signalSplash: splash dropped master, proceeding");
+                diagMark("signalSplash: splash dropped master, proceeding");
         }
     }
     close(fd);
@@ -132,18 +132,7 @@ void signalSplash(const char* msg) {
 // kanlinux: internal profiler function for Hyprland, troubleshooting and figure out performance issue in Hyprland
 // enable rate-limitation to avoid too much logs
 // logs will be seen in stderr and /tmp/kanlinux-init.log and journal log
-void initMark(const std::string& what) {
-    static std::unordered_set<std::string> seen;
-    if (!seen.insert(what).second)
-        return;
-    static const auto T0 = std::chrono::steady_clock::now();
-    const auto        MS = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - T0).count();
-    std::println(stderr, "init[{}ms] {}", MS, what);
-    if (FILE * f = fopen("/tmp/kanlinux-init.log", "a")) {
-        std::println(f, "init[{}ms] {}", MS, what);
-        fclose(f);
-    }
-}
+// kanlinux: diagMark moved to debug/log/Logger.cpp — the logging module owns it
 
 static int handleCritSignal(int signo, void* data) {
     LOG(Log::DEBUG, "Hyprland received signal {}", signo);

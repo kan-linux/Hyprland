@@ -89,8 +89,8 @@ static void notifyGreetdFirstFrame() {
     std::thread([]() {
         constexpr const char* path = "/run/kanlinux-hyprland-ready.sock";
 
-        char       display[64];
-        const char* env = getenv("WAYLAND_DISPLAY");
+        char                  display[64];
+        const char*           env = getenv("WAYLAND_DISPLAY");
         std::snprintf(display, sizeof(display), "%s", (env && *env) ? env : "wayland-1");
 
         char buf[256];
@@ -104,22 +104,22 @@ static void notifyGreetdFirstFrame() {
         for (int i = 0; i < maxAttempts; ++i) {
             int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
             if (fd < 0) {
-                initMark("notify greetd: socket() failed");
+                diagMark("notify greetd: socket() failed");
                 return;
             }
             if (connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0) {
                 const ssize_t n = write(fd, buf, std::strlen(buf));
                 close(fd);
                 if (n > 0)
-                    initMark(std::format("notify greetd: sent READY {}", display));
+                    diagMark(std::format("notify greetd: sent READY {}", display));
                 else
-                    initMark("notify greetd: write failed");
+                    diagMark("notify greetd: write failed");
                 return;
             }
             close(fd);
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
-        initMark("notify greetd: gave up, greetd never listened");
+        diagMark("notify greetd: gave up, greetd never listened");
     }).detach();
 }
 using namespace Hyprutils::Utils;
@@ -267,7 +267,7 @@ void CMonitor::onConnect(bool noRule) {
         // kanlinux: first HW present = pixels actually on screen (vs renderMonitor's "submitted")
         if (!m_hwPresentLogged) {
             m_hwPresentLogged = true;
-            initMark(std::format("monitor {} first frame hw-presented", m_name));
+            diagMark(std::format("monitor {} first frame hw-presented", m_name));
             signalSplash("EXIT\n"); // splash can quit — our FB is on screen
             notifyGreetdFirstFrame();
         }
