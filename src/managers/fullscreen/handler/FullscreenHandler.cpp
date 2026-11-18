@@ -288,8 +288,6 @@ void IFullscreenHandler::setNoMembersAboveFullscreen(const std::optional<SP<Layo
             // Floating members render above the fullscreen window (the "over fullscreen"
             // pass in IHyprRenderer::renderWorkspaceWindowsFullscreen), so they must stay
             // allowed over it and input-live; only tiled members fall below it.
-            diagMark(std::format("[dbg-fs] setNoMembers window {} floating={} SET={} -> allowed={}", w, sc<int>(w->isFloating()), sc<int>(SET),
-                                 sc<int>(w->isFloating() || !SET))); // TEMP DIAGNOSTIC
             w->fullscreenPolicy().setAllowedOverFullscreen(w->isFloating() || !SET);
             w->updateFullscreenInputState();
         }

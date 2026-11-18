@@ -1466,7 +1466,6 @@ void CWindow::mapWindow() {
     if (m_target->floating()) {
         // all new floating windows are allowed over existing FS windows.
         m_fullscreenPolicy->setAllowedOverFullscreen(true);
-        diagMark(std::format("[dbg-map] floating branch hit, window {}", m_self.lock())); // TEMP DIAGNOSTIC
 
         // set the pseudo size to the GOAL of our current size
         // because the windows are animated on RealSize
@@ -1595,7 +1594,6 @@ void CWindow::mapWindow() {
     // avoid this window being visible if it's not the current covering FS window in workspace
     if (PWORKSPACE && Fullscreen::controller()->hasFullscreen(PWORKSPACE) && Fullscreen::controller()->getFullscreenWindow(PWORKSPACE, true) != m_self.lock() &&
         !m_target->floating()) {
-        diagMark(std::format("[dbg-map] poison block hit, window {} floating={}", m_self.lock(), m_target->floating())); // TEMP DIAGNOSTIC
         m_fullscreenPolicy->setAllowedOverFullscreen(false);
         updateFullscreenInputState();
         m_presentation->alpha(WINDOW_ALPHA_FULLSCREEN)->setValueAndWarp(0.f);

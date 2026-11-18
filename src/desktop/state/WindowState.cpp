@@ -1,5 +1,4 @@
 #include "WindowState.hpp"
-#include "../../debug/log/Logger.hpp"
 #include "../../event/EventBus.hpp"
 #include "../../render/Renderer.hpp"
 #include "../view/window/Window.hpp"
@@ -53,7 +52,6 @@ void CWindowState::moveToZ(PHLWINDOW w, bool top) {
     if (!View::validMapped(w) || m_windows.empty())
         return;
 
-    diagMark(std::format("[dbg-z] moveToZ window {} top={} -> allowed={}", w, sc<int>(top), top)); // TEMP DIAGNOSTIC
     w->fullscreenPolicy().setAllowedOverFullscreen(top);
     w->updateFullscreenInputState();
     *w->presentation().alpha(View::WINDOW_ALPHA_FULLSCREEN) = w->isBlockedByFullscreen() ? 0.F : 1.F;

@@ -290,7 +290,6 @@ void CWindowTarget::setFloating(bool x) {
 
     m_cantLockCursor = false;
 
-    diagMark(std::format("[dbg-float] setFloating window {} {} -> {}", m_window.lock(), sc<int>(m_floating), sc<int>(x))); // TEMP DIAGNOSTIC
     m_floating = x;
     m_window->m_state &= ~Desktop::View::WINDOW_STATE_PINNED;
     m_window->stateTracker().scheduleUpdate();
@@ -308,7 +307,6 @@ void CWindowTarget::setFloating(bool x) {
 }
 
 void CWindowTarget::setFloatingInitial(bool x) {
-    diagMark(std::format("[dbg-float] setFloatingInitial window {} -> {}", m_window.lock(), sc<int>(x))); // TEMP DIAGNOSTIC
     m_floating = x;
 }
 
