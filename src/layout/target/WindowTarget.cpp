@@ -1,6 +1,7 @@
 #include "WindowTarget.hpp"
 #include "WindowGeometry.hpp"
 #include "../../desktop/view/window/Window.hpp"
+#include "../../desktop/view/window/WindowFullscreenPolicy.hpp"
 #include "../../desktop/view/window/WindowPresentation.hpp"
 #include "../../desktop/view/window/WindowStateTracker.hpp"
 
@@ -298,6 +299,15 @@ void CWindowTarget::setFloating(bool x) {
     m_floating = x;
     m_window->m_state &= ~Desktop::View::WINDOW_STATE_PINNED;
     m_window->stateTracker().scheduleUpdate();
+
+    // Floating members render over a fullscreen window; mirror the map path so
+    // a window tiled at fullscreen-enter doesn't keep the below-fullscreen
+    // policy (allowed=false / input-blocked) after being floated.
+    if (x) {
+        m_window->fullscreenPolicy().setAllowedOverFullscreen(true);
+        m_window->updateFullscreenInputState();
+        *m_window->presentation().alpha(Desktop::View::WINDOW_ALPHA_FULLSCREEN) = 1.F;
+    }
 
     m_window->m_ruleApplicator->propertiesChanged(Desktop::Rule::RULE_PROP_FLOATING);
 }

@@ -5,6 +5,11 @@
 
 #include "../../config/ConfigValue.hpp"
 
+#include <chrono>
+#include <cstdio>
+#include <print>
+#include <unordered_set>
+
 using namespace Log;
 
 CLogger::CLogger() : m_isTrace(Env::isTrace()) {
@@ -66,4 +71,18 @@ const std::string& CLogger::rolling() {
 
 Hyprutils::CLI::CLogger& CLogger::hu() {
     return m_logger;
+}
+
+// kanlinux: internal diagnostic marker for Hyprland — see Logger.hpp
+void diagMark(const std::string& what) {
+    static std::unordered_set<std::string> seen;
+    if (!seen.insert(what).second)
+        return;
+    static const auto T0 = std::chrono::steady_clock::now();
+    const auto        MS = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - T0).count();
+    std::println(stderr, "diag[{}ms] {}", MS, what);
+    if (FILE* f = fopen("/tmp/kanlinux-hyprland.log", "a")) {
+        std::println(f, "diag[{}ms] {}", MS, what);
+        fclose(f);
+    }
 }

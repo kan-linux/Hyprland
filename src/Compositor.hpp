@@ -27,8 +27,8 @@ enum eManagersInitStage : uint8_t {
     STAGE_LATE
 };
 
-// kanlinux: internal profiler function for Hyprland, troubleshooting and figure out performance issue in Hyprland
-void initMark(const std::string& what);
+// kanlinux: internal diagnostic marker for Hyprland (diagMark — see debug/log/Logger.hpp;
+// the logging module owns the interface)
 // kanlinux: splash two-phase handoff ("HANDOFF\n" / "EXIT\n")
 void signalSplash(const char* msg);
 
