@@ -306,7 +306,7 @@ void CWindowTarget::setFloating(bool x) {
     if (x) {
         m_window->fullscreenPolicy().setAllowedOverFullscreen(true);
         m_window->updateFullscreenInputState();
-        *m_window->presentation().alpha(Desktop::View::WINDOW_ALPHA_FULLSCREEN) = 1.F;
+        m_window->presentation().setFullscreenAlpha(1.F);
     }
 
     m_window->m_ruleApplicator->propertiesChanged(Desktop::Rule::RULE_PROP_FLOATING);
