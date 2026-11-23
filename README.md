@@ -148,3 +148,21 @@ easy IPC, much more QoL stuff than other compositors and more...
 [Badge License]: https://img.shields.io/github/license/hyprwm/Hyprland
 [Badge Lines]: https://img.shields.io/tokei/lines/github/hyprwm/Hyprland
 [Badge Hi Mom]: https://img.shields.io/badge/Hi-mom!-ff69b4
+
+
+## Branches
+
+- main
+  https://github.com/kan-linux/Hyprland/tree/main, track [upstream Hyprland project](https://github.com/hyprwm/Hyprland).
+
+- kan
+  https://github.com/kan-linux/Hyprland/tree/kan, the default branch, development branch
+
+- kan-v0.3.3
+  https://github.com/kan-linux/Hyprland/tree/kan-v0.3.3, the released branch in Kan-Linux v0.3.3
+
+- kan-v0.3.2
+  https://github.com/kan-linux/Hyprland/tree/kan-v0.3.2, the released branch in Kan-Linux v0.3.2
+
+- pr_to_upstream_2
+  https://github.com/kan-linux/Hyprland/tree/pr_to_upstream_2, the second PR to upstream
