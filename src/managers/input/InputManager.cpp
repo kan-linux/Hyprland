@@ -128,7 +128,7 @@ CInputManager::~CInputManager() {
 }
 
 void CInputManager::onMouseMoved(IPointer::SMotionEvent e) {
-    static auto PNOACCEL = CConfigValue<Config::INTEGER>("input:force_no_accel");
+    static auto PNOACCEL = CConfigValue<Config::BOOL>("input:force_no_accel");
 
     Vector2D    delta   = e.delta;
     Vector2D    unaccel = e.unaccel;
@@ -261,12 +261,12 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
 
     static auto PFOLLOWMOUSE          = CConfigValue<Config::INTEGER>("input:follow_mouse");
     static auto PFOLLOWMOUSETHRESHOLD = CConfigValue<Config::FLOAT>("input:follow_mouse_threshold");
-    static auto PMOUSEREFOCUS         = CConfigValue<Config::INTEGER>("input:mouse_refocus");
-    static auto PFOLLOWONDND          = CConfigValue<Config::INTEGER>("misc:always_follow_on_dnd");
+    static auto PMOUSEREFOCUS         = CConfigValue<Config::BOOL>("input:mouse_refocus");
+    static auto PFOLLOWONDND          = CConfigValue<Config::BOOL>("misc:always_follow_on_dnd");
     static auto PFLOATBEHAVIOR        = CConfigValue<Config::INTEGER>("input:float_switch_override_focus");
-    static auto PMOUSEFOCUSMON        = CConfigValue<Config::INTEGER>("misc:mouse_move_focuses_monitor");
-    static auto PRESIZEONBORDER       = CConfigValue<Config::INTEGER>("general:resize_on_border");
-    static auto PRESIZECURSORICON     = CConfigValue<Config::INTEGER>("general:hover_icon_on_border");
+    static auto PMOUSEFOCUSMON        = CConfigValue<Config::BOOL>("misc:mouse_move_focuses_monitor");
+    static auto PRESIZEONBORDER       = CConfigValue<Config::BOOL>("general:resize_on_border");
+    static auto PRESIZECURSORICON     = CConfigValue<Config::BOOL>("general:hover_icon_on_border");
 
     const auto  FOLLOWMOUSE = *PFOLLOWONDND && PROTO::data->dndActive() ? 1 : *PFOLLOWMOUSE;
 
@@ -855,11 +855,11 @@ void CInputManager::setClickMode(eClickBehaviorMode mode) {
 void CInputManager::processMouseDownNormal(const IPointer::SButtonEvent& e, SP<IPointer> mouse) {
 
     // notify the keybind manager
-    static auto PPASSMOUSE         = CConfigValue<Config::INTEGER>("binds:pass_mouse_when_bound");
+    static auto PPASSMOUSE         = CConfigValue<Config::BOOL>("binds:pass_mouse_when_bound");
     const auto  PASS               = Keybinds::mgr()->onMouseEvent(e, mouse);
     static auto PFOLLOWMOUSE       = CConfigValue<Config::INTEGER>("input:follow_mouse");
     static auto PSWALLOWFOCUSCLICK = CConfigValue<Config::BOOL>("input:swallow_focus_click");
-    static auto PRESIZEONBORDER    = CConfigValue<Config::INTEGER>("general:resize_on_border");
+    static auto PRESIZEONBORDER    = CConfigValue<Config::BOOL>("general:resize_on_border");
     static auto PBORDERSIZE        = CConfigValue<Config::INTEGER>("general:border_size");
     static auto PBORDERGRABEXTEND  = CConfigValue<Config::INTEGER>("general:extend_border_grab_area");
     const auto  BORDER_GRAB_AREA   = *PRESIZEONBORDER ? *PBORDERSIZE + *PBORDERGRABEXTEND : 0;
@@ -1147,7 +1147,7 @@ void CInputManager::newVirtualKeyboard(SP<CVirtualKeyboardV1Resource> keyboard) 
 }
 
 void CInputManager::setupKeyboard(SP<IKeyboard> keeb) {
-    static auto PDPMS = CConfigValue<Config::INTEGER>("misc:key_press_enables_dpms");
+    static auto PDPMS = CConfigValue<Config::BOOL>("misc:key_press_enables_dpms");
 
     m_hids.emplace_back(keeb);
 
@@ -2227,12 +2227,10 @@ void CInputManager::setCursorIconOnBorder(PHLWINDOW w) {
         return;
     }
 
-    static auto PEXTENDBORDERGRAB = CConfigValue<Config::INTEGER>("general:extend_border_grab_area");
-    const int   BORDERSIZE        = w->presentation().borderSize();
-    const int   ROUNDING          = w->presentation().rounding();
+    static auto          PEXTENDBORDERGRAB = CConfigValue<Config::INTEGER>("general:extend_border_grab_area");
+    const int            BORDERSIZE        = w->presentation().borderSize();
+    const auto           ROUNDING          = w->presentation().rounding();
 
-    // give a small leeway (10 px) for corner icon
-    const auto           CORNER           = ROUNDING + BORDERSIZE + 10;
     const auto           mouseCoords      = getMouseCoordsInternal();
     CBox                 box              = w->getWindowMainSurfaceBox();
     eBorderIconDirection direction        = BORDERICON_NONE;
@@ -2259,46 +2257,8 @@ void CInputManager::setCursorIconOnBorder(PHLWINDOW w) {
 
         if (onDeco)
             direction = BORDERICON_NONE;
-        else {
-            if (box.containsPoint(mouseCoords)) {
-                if (!w->presentation().isInCurvedCorner(mouseCoords.x, mouseCoords.y)) {
-                    direction = BORDERICON_NONE;
-                } else {
-                    if (mouseCoords.y < box.y + CORNER) {
-                        if (mouseCoords.x < box.x + CORNER)
-                            direction = BORDERICON_UP_LEFT;
-                        else
-                            direction = BORDERICON_UP_RIGHT;
-                    } else {
-                        if (mouseCoords.x < box.x + CORNER)
-                            direction = BORDERICON_DOWN_LEFT;
-                        else
-                            direction = BORDERICON_DOWN_RIGHT;
-                    }
-                }
-            } else {
-                if (mouseCoords.y < box.y + CORNER) {
-                    if (mouseCoords.x < box.x + CORNER)
-                        direction = BORDERICON_UP_LEFT;
-                    else if (mouseCoords.x > box.x + box.width - CORNER)
-                        direction = BORDERICON_UP_RIGHT;
-                    else
-                        direction = BORDERICON_UP;
-                } else if (mouseCoords.y > box.y + box.height - CORNER) {
-                    if (mouseCoords.x < box.x + CORNER)
-                        direction = BORDERICON_DOWN_LEFT;
-                    else if (mouseCoords.x > box.x + box.width - CORNER)
-                        direction = BORDERICON_DOWN_RIGHT;
-                    else
-                        direction = BORDERICON_DOWN;
-                } else {
-                    if (mouseCoords.x < box.x + CORNER)
-                        direction = BORDERICON_LEFT;
-                    else if (mouseCoords.x > box.x + box.width - CORNER)
-                        direction = BORDERICON_RIGHT;
-                }
-            }
-        }
+        else if (!box.containsPoint(mouseCoords) || w->presentation().isInCurvedCorner(mouseCoords.x, mouseCoords.y))
+            direction = Input::borderIconDirection(mouseCoords - box.pos(), box.size(), ROUNDING, BORDERSIZE);
     }
 
     if (direction == m_borderIconDirection)
@@ -2320,7 +2280,7 @@ void CInputManager::setCursorIconOnBorder(PHLWINDOW w) {
 }
 
 void CInputManager::recheckMouseWarpOnMouseInput() {
-    static auto PWARPFORNONMOUSE = CConfigValue<Config::INTEGER>("cursor:warp_back_after_non_mouse_input");
+    static auto PWARPFORNONMOUSE = CConfigValue<Config::BOOL>("cursor:warp_back_after_non_mouse_input");
 
     if (!m_lastInputMouse && *PWARPFORNONMOUSE)
         Pointer::mgr()->warpTo(m_lastMousePos);

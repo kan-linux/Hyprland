@@ -26,7 +26,7 @@ static int windowZIndex(PHLWINDOW window) {
 }
 
 static bool shouldBlurWindow(PHLWINDOW window) {
-    static auto PBLUR = CConfigValue<Config::INTEGER>("decoration:blur:enabled");
+    static auto PBLUR = CConfigValue<Config::BOOL>("decoration:blur:enabled");
     if (!*PBLUR)
         return false;
 
@@ -52,7 +52,7 @@ static void damageWeakFadeout(WP<T> fadeout) {
 }
 
 SP<CWindowFadeout> CWindowFadeout::create(PHLWINDOW window, SP<Render::IFramebuffer> snapshot, float sourceAlpha, SP<Render::IFramebuffer> workspaceSnapshot) {
-    static auto PBLURXRAY = CConfigValue<Config::INTEGER>("decoration:blur:xray");
+    static auto PBLURXRAY = CConfigValue<Config::BOOL>("decoration:blur:xray");
 
     if (!window || (!snapshot && !workspaceSnapshot))
         return nullptr;
@@ -180,7 +180,7 @@ SFadeoutRenderEffects CWindowFadeout::effects() const {
     if (m_blur && MONITOR) {
         effects.preBlur = SFadeoutPreBlur{
             .box           = CBox{m_realPosition->value(), m_realSize->value()}.translate(-MONITOR->m_position).scale(MONITOR->m_scale).round(),
-            .round         = m_rounding,
+            .round         = m_rounding * MONITOR->m_scale,
             .roundingPower = m_roundingPower,
             .xray          = m_blurXray,
             .alpha         = std::sqrt(std::max(alpha(), 0.F)),

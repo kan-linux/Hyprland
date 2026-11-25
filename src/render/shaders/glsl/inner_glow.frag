@@ -12,7 +12,7 @@ uniform mat3  targetPrimariesXYZ;
 uniform vec2  topLeft;
 uniform vec2  bottomRight;
 uniform vec2  fullSize;
-uniform float radius;
+uniform vec4  radius;
 uniform float roundingPower;
 uniform float range;
 uniform float shadowPower;
@@ -59,7 +59,7 @@ void main() {
 #endif
 #if USE_TONEMAP
                      ,
-                     maxLuminance, dstMaxLuminance, dstRefLuminance, srcRefLuminance, tonemapMode
+                     maxLuminance, dstMaxLuminance, dstRefLuminance, tonemapMode
 #endif
 #if USE_SDR_MOD
                      ,

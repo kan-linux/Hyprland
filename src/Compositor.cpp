@@ -143,11 +143,17 @@ static int handleCritSignal(int signo, void* data) {
     return 0;
 }
 
+// libwayland chains its SIGBUS handler (for client shm buffers) to whatever was installed before its first shm access,
+// so ours must be installed before the display runs, and must not be reset while it runs.
+static constexpr std::array UNRECOVERABLE_SIGNALS = {SIGSEGV, SIGABRT, SIGBUS, SIGILL, SIGFPE};
+
+//
 static void handleUnrecoverableSignal(int sig) {
 
     // remove our handlers
-    signal(SIGABRT, SIG_DFL);
-    signal(SIGSEGV, SIG_DFL);
+    for (const auto& s : UNRECOVERABLE_SIGNALS) {
+        signal(s, SIG_DFL);
+    }
 
     // Kill the program if the crash-reporter is caught in a deadlock.
     signal(SIGALRM, [](int _) {
@@ -157,9 +163,11 @@ static void handleUnrecoverableSignal(int sig) {
     });
     alarm(15);
 
-    CrashReporter::createAndSaveCrash(sig);
+    CrashReporter::createAndSaveCrash(sig, __builtin_return_address(0));
 
-    abort();
+    // Re-raise with the default handler. The signal is blocked until we return, so it's delivered at the original crash site,
+    // which gives core dumps the original signal and a clean stack.
+    raise(sig);
 }
 
 static void handleUserSignal(int sig) {
@@ -342,8 +350,9 @@ void CCompositor::initServer(std::string socketName, int socketFd) {
     m_critSigSource = wl_event_loop_add_signal(m_wlEventLoop, SIGTERM, handleCritSignal, nullptr);
 
     if (!Env::envEnabled("HYPRLAND_NO_CRASHREPORTER")) {
-        signal(SIGSEGV, handleUnrecoverableSignal);
-        signal(SIGABRT, handleUnrecoverableSignal);
+        for (const auto& s : UNRECOVERABLE_SIGNALS) {
+            signal(s, handleUnrecoverableSignal);
+        }
     }
     signal(SIGUSR1, handleUserSignal);
 
@@ -621,8 +630,13 @@ void CCompositor::cleanup() {
 
     writeWatchdogFd("end");
 
-    signal(SIGABRT, SIG_DFL);
-    signal(SIGSEGV, SIG_DFL);
+    for (const auto& s : UNRECOVERABLE_SIGNALS) {
+        // this could replace libwayland's handler, which is still needed while we clean up
+        if (s == SIGBUS)
+            continue;
+
+        signal(s, SIG_DFL);
+    }
 
     removeLockFile();
 
@@ -937,9 +951,9 @@ Vector2D CCompositor::parseWindowVectorArgsRelative(const std::string& args, con
 }
 
 void CCompositor::performUserChecks() {
-    static auto PNOCHECKXDG      = CConfigValue<Config::INTEGER>("misc:disable_xdg_env_checks");
-    static auto PNOCHECKGUIUTILS = CConfigValue<Config::INTEGER>("misc:disable_hyprland_guiutils_check");
-    static auto PNOWATCHDOG      = CConfigValue<Config::INTEGER>("misc:disable_watchdog_warning");
+    static auto PNOCHECKXDG      = CConfigValue<Config::BOOL>("misc:disable_xdg_env_checks");
+    static auto PNOCHECKGUIUTILS = CConfigValue<Config::BOOL>("misc:disable_hyprland_guiutils_check");
+    static auto PNOWATCHDOG      = CConfigValue<Config::BOOL>("misc:disable_watchdog_warning");
 
     if (!*PNOCHECKXDG) {
         const auto CURRENT_DESKTOP_ENV = getenv("XDG_CURRENT_DESKTOP");
