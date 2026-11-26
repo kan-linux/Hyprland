@@ -54,19 +54,19 @@ PHLWINDOW CViewHitTester::windowAtInternal(const Vector2D& pos, uint16_t propert
 
     const auto  isShadowedByModal = [](PHLWINDOW w) -> bool { return *PMODALPARENTBLOCKING && !w->backend().isX11() && w->backend().traits().hasModalChild; };
 
-    // The border-grab band (BORDER_GRAB_AREA expansion, for resize-on-border) must
-    // not steal a hit from a window actually under the cursor: with overlapping
-    // floating windows the lower window's visible area lies inside the upper
-    // window's band. A band-only match is valid just for points in gaps.
-    const auto realBoxAt = [&]() -> bool {
+    // band-only matches are for gaps: a real box under the cursor wins over a grab band
+    const bool REAL_BOX_AT = BORDER_GRAB_AREA > 0 && [&]() -> bool {
         for (auto const& w : WINDOWS) {
             if (!w->mapped() || !w->acceptsInput() || !w->m_workspace || !w->m_workspace->visible())
+                continue;
+            // windows the scans below can never return must not suppress the band hit
+            if (w == ignoreWindow || w->m_ruleApplicator->noFocus().valueOrDefault())
                 continue;
             if (w->getWindowBoxUnified(properties).containsPoint(pos))
                 return true;
         }
         return false;
-    };
+    }();
 
     // pinned windows on top of floating regardless
     if (properties & ALLOW_FLOATING) {
@@ -80,8 +80,7 @@ PHLWINDOW CViewHitTester::windowAtInternal(const Vector2D& pos, uint16_t propert
                 CBox       box = BB.copy().expand(!w->backend().traits().overrideRedirect ? BORDER_GRAB_AREA : 0);
                 if (HITBOX_SHRINK > 0 && w != LASTFOCUSED)
                     box = box.copy().expand(-HITBOX_SHRINK);
-                // a band-only hit must not steal the click from a window actually under the cursor
-                if (box.containsPoint(pos) && (BB.containsPoint(pos) || !realBoxAt()))
+                if (box.containsPoint(pos) && (BB.containsPoint(pos) || !REAL_BOX_AT))
                     return w;
 
                 if (!w->backend().isX11()) {
@@ -133,7 +132,7 @@ PHLWINDOW CViewHitTester::windowAtInternal(const Vector2D& pos, uint16_t propert
                         CBox       box = BB.copy().expand(!w->backend().traits().overrideRedirect ? BORDER_GRAB_AREA : 0);
                         if (HITBOX_SHRINK > 0 && w != LASTFOCUSED)
                             box = box.copy().expand(-HITBOX_SHRINK);
-                        if (box.containsPoint(pos) && (BB.containsPoint(pos) || !realBoxAt())) {
+                        if (box.containsPoint(pos) && (BB.containsPoint(pos) || !REAL_BOX_AT)) {
                             if (w->backend().isX11()) {
                                 const auto TRAITS = w->backend().traits();
                                 if (TRAITS.overrideRedirect && !TRAITS.wantsFocus) {
@@ -156,10 +155,7 @@ PHLWINDOW CViewHitTester::windowAtInternal(const Vector2D& pos, uint16_t propert
                 return nullptr;
             };
 
-            // Non-fullscreen floating windows render ABOVE any fullscreen window (the
-            // "over fullscreen" pass in IHyprRenderer::renderWorkspaceWindowsFullscreen),
-            // so when hitting above-fullscreen, test them first: a floating fullscreen
-            // window covering the whole screen must not shadow them by stack order alone.
+            // non-fullscreen floating render above fullscreen, so hit them first
             if (aboveFullscreen) {
                 if (const auto OVER = scan(false); OVER)
                     return OVER;
