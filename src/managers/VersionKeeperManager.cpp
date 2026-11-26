@@ -20,6 +20,9 @@ using namespace Hyprutils::OS;
 constexpr const char* VERSION_FILE_NAME = "lastVersion";
 
 CVersionKeeperManager::CVersionKeeperManager() {
+    // kan-linux: suppress the version-upgrade welcome screen
+    return;
+
     static auto PNONOTIFY = CConfigValue<Config::BOOL>("ecosystem:no_update_news");
 
     const auto  DATAROOT = NFsUtils::getDataHome();
@@ -79,5 +82,5 @@ bool CVersionKeeperManager::isMajorVersionOlderThanRunning(const std::string& ve
 }
 
 bool CVersionKeeperManager::fired() {
-    return m_fired;
+    return true; // kan-linux: report as fired so supress other no-need pages
 }
